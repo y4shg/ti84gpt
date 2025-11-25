@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TI-84 ChatGPT Bridge</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.2);
+            font-size: 14px;
+        }
+        .status.connected {
+            background: #10b981;
+        }
+        .config-section {
+            padding: 30px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .config-section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .chat-section {
+            padding: 30px;
+        }
+        .chat-log {
+            height: 400px;
+            overflow-y: auto;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #f9fafb;
+        }
+        .message {
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        .message.calculator {
+            background: #dbeafe;
+            margin-right: auto;
+        }
+        .message.assistant {
+            background: #dcfce7;
+            margin-left: auto;
+        }
+        .message.system {
+            background: #fef3c7;
+            margin: 0 auto;
+            text-align: center;
+            max-width: 100%;
+            font-size: 13px;
+        }
+        .message-label {
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 4px;
+            color: #374151;
+        }
+        .message-text {
+            color: #1f2937;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧮 TI-84 ChatGPT Bridge</h1>
+            <div class="status" id="status">Disconnected</div>
+        </div>
+
+        <div class="config-section">
+            <h2>⚙️ API Configuration</h2>
+            <div class="form-group">
+                <label for="apiBase">API Base URL</label>
+                <input type="text" id="apiBase" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+            </div>
+            <div class="form-group">
+                <label for="apiKey">API Key</label>
+                <input type="password" id="apiKey" placeholder="sk-...">
+            </div>
+            <div class="form-group">
+                <label for="model">Model</label>
+                <input type="text" id="model" placeholder="gpt-3.5-turbo" value="gpt-3.5-turbo">
+            </div>
+            <button class="btn btn-primary" id="connectBtn">Connect to Calculator</button>
+        </div>
+
+        <div class="chat-section">
+            <h2>💬 Chat Log</h2>
+            <div class="chat-log" id="chatLog">
+                <div class="message system">
+                    <div class="message-text">Waiting for calculator connection...</div>
+                </div>
+            </div>
+            <div class="info-box">
+                <strong>Instructions:</strong> Connect your TI-84 Plus CE via USB, click "Connect to Calculator", 
+                then send messages from your calculator. The browser will forward them to ChatGPT and return the response.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TI84_VENDOR_ID = 0x0451;
+        const TI84_PRODUCT_ID = 0xE008;
+        
+        let device = null;
+        let interfaceNumber = 0;
+        let endpointIn = null;
+        let endpointOut = null;
+        let isConnected = false;
+        let conversationHistory = [];
+
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const chatLog = document.getElementById('chatLog');
+        const apiBaseInput = document.getElementById('apiBase');
+        const apiKeyInput = document.getElementById('apiKey');
+        const modelInput = document.getElementById('model');
+
+        connectBtn.addEventListener('click', connectCalculator);
+
+        async function connectCalculator() {
+            try {
+                device = await navigator.usb.requestDevice({
+                    filters: [{ vendorId: TI84_VENDOR_ID, productId: TI84_PRODUCT_ID }]
+                });
+
+                await device.open();
+                await device.selectConfiguration(1);
+                
+                interfaceNumber = device.configuration.interfaces[0].interfaceNumber;
+                await device.claimInterface(interfaceNumber);
+
+                const iface = device.configuration.interfaces[0];
+                endpointIn = iface.alternate.endpoints.find(e => e.direction === 'in');
+                endpointOut = iface.alternate.endpoints.find(e => e.direction === 'out');
+
+                isConnected = true;
+                updateStatus(true);
+                addSystemMessage('Calculator connected successfully!');
+                
+                startListening();
+            } catch (error) {
+                console.error('Connection error:', error);
+                addSystemMessage('Failed to connect: ' + error.message);
+            }
+        }
+
+        async function startListening() {
+            while (isConnected) {
+                try {
+                    const result = await device.transferIn(endpointIn.endpointNumber, 1024);
+                    
+                    if (result.data && result.data.byteLength > 0) {
+                        const decoder = new TextDecoder();
+                        const message = decoder.decode(result.data).trim();
+                        
+                        if (message.length > 0) {
+                            addCalculatorMessage(message);
+                            await processMessage(message);
+                        }
+                    }
+                } catch (error) {
+                    if (isConnected) {
+                        console.error('Transfer error:', error);
+                        isConnected = false;
+                        updateStatus(false);
+                        addSystemMessage('Calculator disconnected');
+                    }
+                    break;
+                }
+            }
+        }
+
+        async function processMessage(userMessage) {
+            const apiBase = apiBaseInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+            const model = modelInput.value.trim();
+
+            if (!apiKey) {
+                addSystemMessage('Error: API key not configured');
+                await sendToCalculator('Error: API key not set in browser');
+                return;
+            }
+
+            conversationHistory.push({
+                role: 'user',
+                content: userMessage
+            });
+
+            addSystemMessage('Sending to ChatGPT...');
+
+            try {
+                const response = await fetch(`${apiBase}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: conversationHistory,
+                        max_tokens: 200,
+                        temperature: 0.7
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const assistantMessage = data.choices[0].message.content;
+
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: assistantMessage
+                });
+
+                addAssistantMessage(assistantMessage);
+                await sendToCalculator(assistantMessage);
+
+            } catch (error) {
+                console.error('API error:', error);
+                const errorMsg = 'Error: ' + error.message;
+                addSystemMessage(errorMsg);
+                await sendToCalculator(errorMsg);
+            }
+        }
+
+        async function sendToCalculator(message) {
+            if (!isConnected || !device) return;
+
+            try {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(message + '\n');
+                
+                const chunkSize = 64;
+                for (let i = 0; i < data.length; i += chunkSize) {
+                    const chunk = data.slice(i, i + chunkSize);
+                    await device.transferOut(endpointOut.endpointNumber, chunk);
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+            } catch (error) {
+                console.error('Send error:', error);
+                addSystemMessage('Failed to send to calculator: ' + error.message);
+            }
+        }
+
+        function addCalculatorMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message calculator';
+            msgDiv.innerHTML = `
+                <div class="message-label">📱 Calculator</div>
+                <div class="message-text">${escapeHtml(text)}</div>
+            `;
+            chatLog.appendChild(msgDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function addAssistantMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message assistant';
+            msgDiv.innerHTML = `
+                <div class="message-label">🤖 ChatGPT</div>
+                <div class="message-text">${escapeHtml(text)}</div>
+            `;
+            chatLog.appendChild(msgDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message system';
+            msgDiv.innerHTML = `<div class="message-text">${escapeHtml(text)}</div>`;
+            chatLog.appendChild(msgDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function updateStatus(connected) {
+            if (connected) {
+                statusEl.textContent = '✓ Connected';
+                statusEl.classList.add('connected');
+                connectBtn.textContent = 'Connected';
+                connectBtn.disabled = true;
+            } else {
+                statusEl.textContent = 'Disconnected';
+                statusEl.classList.remove('connected');
+                connectBtn.textContent = 'Connect to Calculator';
+                connectBtn.disabled = false;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        navigator.usb.addEventListener('disconnect', (event) => {
+            if (event.device === device) {
+                isConnected = false;
+                updateStatus(false);
+                addSystemMessage('Calculator disconnected');
+            }
+        });
+    </script>
+</body>
+</html>
