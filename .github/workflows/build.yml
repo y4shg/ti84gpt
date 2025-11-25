@@ -1,0 +1,77 @@
+name: Build TI-84 Plus CE Program
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Cache CEdev
+      id: cache-cedev
+      uses: actions/cache@v3
+      with:
+        path: /opt/CEdev
+        key: ${{ runner.os }}-cedev-v11.2
+        
+    - name: Download and Install CE C/C++ Toolchain
+      if: steps.cache-cedev.outputs.cache-hit != 'true'
+      run: |
+        wget https://github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz
+        sudo mkdir -p /opt
+        sudo tar -xzf CEdev-Linux.tar.gz -C /opt
+        
+    - name: Set up environment
+      run: |
+        echo "CEDEV=/opt/CEdev" >> $GITHUB_ENV
+        echo "/opt/CEdev/bin" >> $GITHUB_PATH
+        
+    - name: Verify toolchain installation
+      run: |
+        ls -la /opt/CEdev/bin
+        which ez80-clang || echo "ez80-clang not in PATH"
+        
+    - name: Build project
+      run: |
+        export CEDEV=/opt/CEdev
+        export PATH=$CEDEV/bin:$PATH
+        make
+        
+    - name: List build artifacts
+      run: |
+        ls -la bin/
+        
+    - name: Upload 8xp file
+      uses: actions/upload-artifact@v4
+      with:
+        name: ti84-chatgpt-program
+        path: bin/*.8xp
+        if-no-files-found: error
+        
+    - name: Upload debug files
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: debug-files
+        path: |
+          bin/*.bin
+          bin/*.map
+        if-no-files-found: ignore
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          bin/*.8xp
+          README.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
