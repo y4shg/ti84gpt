@@ -253,31 +253,36 @@ void clearInput(void) {
 static usb_error_t handleBulkOut(usb_endpoint_t endpoint, usb_transfer_status_t status,
                                   size_t transferred, usb_transfer_data_t* data) {
     if (status == USB_TRANSFER_COMPLETED && transferred > 0) {
-        if (receiveIndex + transferred < BUFFER_SIZE) {
-            memcpy(receiveBuffer + receiveIndex, data, transferred);
-            receiveIndex += transferred;
-            receiveBuffer[receiveIndex] = 0;
-            
-            if (strchr(receiveBuffer, '\n')) {
-                char* newline = strchr(receiveBuffer, '\n');
-                *newline = 0;
-                
-                appendToDisplay("AI: ");
-                appendToDisplay(receiveBuffer);
-                appendToDisplay("\n");
-                
-                receiveIndex = 0;
-                memset(receiveBuffer, 0, BUFFER_SIZE);
-                
-                waitingForResponse = false;
-                displayScreen();
+        // Copy received data to buffer
+        for (size_t i = 0; i < transferred && receiveIndex < BUFFER_SIZE - 1; i++) {
+            char c = ((char*)data)[i];
+            if (c != 0) {  // Skip null bytes
+                receiveBuffer[receiveIndex++] = c;
             }
         }
+        receiveBuffer[receiveIndex] = 0;
         
-        return usb_ScheduleBulkTransfer(endpoint, data, 64, handleBulkOut, data);
+        // Check if we have a complete message (ends with newline)
+        char* newline = strchr(receiveBuffer, '\n');
+        if (newline) {
+            *newline = 0;  // Remove newline
+            
+            // Add to display
+            appendToDisplay("AI: ");
+            appendToDisplay(receiveBuffer);
+            appendToDisplay("\n");
+            
+            // Reset receive buffer
+            receiveIndex = 0;
+            memset(receiveBuffer, 0, BUFFER_SIZE);
+            
+            waitingForResponse = false;
+            displayScreen();
+        }
     }
     
-    return USB_SUCCESS;
+    // Schedule next transfer
+    return usb_ScheduleBulkTransfer(endpoint, data, 64, handleBulkOut, data);
 }
 
 static usb_error_t handleUsbEvent(usb_event_t event, void* event_data, void* callback_data) {
