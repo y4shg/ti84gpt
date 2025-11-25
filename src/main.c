@@ -65,8 +65,9 @@ int main(void) {
     
     gfx_Begin();
     gfx_SetDrawBuffer();
-    gfx_SetTextTransparentColor(0);
+    gfx_SetTextBGColor(0);
     gfx_SetTextFGColor(255);
+    gfx_SetTextTransparentColor(0);
     
     drawConnectingScreen();
     gfx_BlitBuffer();
@@ -131,10 +132,14 @@ void drawConnectingScreen(void) {
     gfx_SetColor(255);
     gfx_Rectangle(0, 0, SCREEN_WIDTH, 30);
     
+    gfx_SetTextBGColor(31);
+    gfx_SetTextFGColor(255);
     gfx_SetTextXY(80, 10);
     gfx_PrintString("TI-84 ChatGPT");
     
     // Status
+    gfx_SetTextBGColor(0);
+    gfx_SetTextFGColor(255);
     gfx_SetTextXY(10, 50);
     if (connected) {
         gfx_PrintString("Status: Connected");
@@ -153,12 +158,14 @@ void drawConnectingScreen(void) {
     gfx_SetColor(255);
     gfx_Rectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40);
     
-    gfx_SetTextXY(90, SCREEN_HEIGHT - 28);
+    gfx_SetTextBGColor(224);
     gfx_SetTextFGColor(0);
+    gfx_SetTextXY(90, SCREEN_HEIGHT - 28);
     gfx_PrintString("Made by y4shg");
-    gfx_SetTextFGColor(255);
     
     // Instructions
+    gfx_SetTextBGColor(0);
+    gfx_SetTextFGColor(255);
     gfx_SetTextXY(10, SCREEN_HEIGHT - 15);
     gfx_PrintString("CLEAR = Quit");
 }
@@ -172,6 +179,8 @@ void drawMessages(void) {
     gfx_SetColor(255);
     gfx_Rectangle(0, 0, SCREEN_WIDTH, 20);
     
+    gfx_SetTextBGColor(31);
+    gfx_SetTextFGColor(255);
     gfx_SetTextXY(5, 6);
     if (waitingForResponse) {
         gfx_PrintString("ChatGPT - Waiting...");
@@ -185,6 +194,8 @@ void drawMessages(void) {
     gfx_SetColor(255);
     gfx_Rectangle(0, SCREEN_HEIGHT - 15, SCREEN_WIDTH, 15);
     
+    gfx_SetTextBGColor(31);
+    gfx_SetTextFGColor(255);
     gfx_SetTextXY(5, SCREEN_HEIGHT - 11);
     gfx_PrintString("2nd=Type  Arrows=Scroll  CLEAR=Quit");
     
@@ -211,15 +222,18 @@ void drawMessages(void) {
         
         int xPos;
         uint8_t bubbleColor;
+        uint8_t textColor;
         
         if (msg->isUser) {
             // User message (right side, blue)
             xPos = SCREEN_WIDTH - bubbleWidth - BUBBLE_MARGIN;
             bubbleColor = 160;  // Blue
+            textColor = 255;    // White text
         } else {
             // AI message (left side, green)
             xPos = BUBBLE_MARGIN;
             bubbleColor = 192;  // Green
+            textColor = 0;      // Black text
         }
         
         // Only draw if visible on screen
@@ -231,6 +245,8 @@ void drawMessages(void) {
             gfx_Rectangle(xPos, yPos, bubbleWidth, bubbleHeight);
             
             // Draw text
+            gfx_SetTextBGColor(bubbleColor);
+            gfx_SetTextFGColor(textColor);
             for (int i = 0; i < numLines; i++) {
                 gfx_SetTextXY(xPos + BUBBLE_PADDING, yPos + BUBBLE_PADDING + (i * LINE_HEIGHT));
                 gfx_PrintString(lines[i]);
@@ -252,6 +268,8 @@ void drawInputScreen(void) {
     gfx_SetColor(255);
     gfx_Rectangle(0, 0, SCREEN_WIDTH, 25);
     
+    gfx_SetTextBGColor(31);
+    gfx_SetTextFGColor(255);
     gfx_SetTextXY(80, 8);
     gfx_PrintString("Type Message");
     
@@ -265,6 +283,8 @@ void drawInputScreen(void) {
     char lines[15][38];
     int numLines = wrapText(inputBuffer, 38, lines, 15);
     
+    gfx_SetTextBGColor(64);
+    gfx_SetTextFGColor(255);
     for (int i = 0; i < numLines && i < 15; i++) {
         gfx_SetTextXY(15, 40 + (i * LINE_HEIGHT));
         gfx_PrintString(lines[i]);
@@ -279,6 +299,8 @@ void drawInputScreen(void) {
     }
     
     // Instructions
+    gfx_SetTextBGColor(0);
+    gfx_SetTextFGColor(255);
     gfx_SetTextXY(10, SCREEN_HEIGHT - 25);
     gfx_PrintString("ENTER = Send    CLEAR = Cancel");
     gfx_SetTextXY(10, SCREEN_HEIGHT - 13);
