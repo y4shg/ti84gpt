@@ -203,6 +203,7 @@
                 <textarea id="systemPrompt" rows="3" placeholder="You are a helpful assistant...">You are a helpful assistant designed to provide concise answers for a TI-84 calculator display. Keep responses brief and clear, under 200 characters when possible.</textarea>
             </div>
             <button class="btn btn-primary" id="connectBtn">Connect to Calculator</button>
+            <button class="btn btn-primary" id="clearBtn" style="margin-left: 10px; display: none;">Clear Chat History</button>
         </div>
 
         <div class="chat-section">
@@ -233,6 +234,7 @@
 
         const statusEl = document.getElementById('status');
         const connectBtn = document.getElementById('connectBtn');
+        const clearBtn = document.getElementById('clearBtn');
         const chatLog = document.getElementById('chatLog');
         const apiBaseInput = document.getElementById('apiBase');
         const apiKeyInput = document.getElementById('apiKey');
@@ -240,6 +242,7 @@
         const systemPromptInput = document.getElementById('systemPrompt');
 
         connectBtn.addEventListener('click', connectCalculator);
+        clearBtn.addEventListener('click', clearHistory);
 
         async function connectCalculator() {
             try {
@@ -271,7 +274,10 @@
 
                 isConnected = true;
                 updateStatus(true);
-                addSystemMessage('Calculator connected successfully!');
+                addSystemMessage('Calculator connected successfully! Make sure the program is running on your calculator.');
+                
+                // Give calculator time to initialize
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 startListening();
             } catch (error) {
@@ -282,6 +288,8 @@
 
         async function startListening() {
             isReading = true;
+            addSystemMessage('Started listening for calculator messages...');
+            
             while (isConnected && isReading) {
                 try {
                     const result = await device.transferIn(endpointIn.endpointNumber, 64);
@@ -304,7 +312,7 @@
                         isConnected = false;
                         isReading = false;
                         updateStatus(false);
-                        addSystemMessage('Calculator disconnected');
+                        addSystemMessage('Calculator disconnected: ' + error.message);
                     }
                     break;
                 }
@@ -457,12 +465,20 @@
                 statusEl.classList.add('connected');
                 connectBtn.textContent = 'Connected';
                 connectBtn.disabled = true;
+                clearBtn.style.display = 'inline-block';
             } else {
                 statusEl.textContent = 'Disconnected';
                 statusEl.classList.remove('connected');
                 connectBtn.textContent = 'Connect to Calculator';
                 connectBtn.disabled = false;
+                clearBtn.style.display = 'none';
             }
+        }
+
+        function clearHistory() {
+            conversationHistory = [];
+            chatLog.innerHTML = '<div class="message system"><div class="message-text">Chat history cleared</div></div>';
+            addSystemMessage('Ready for new conversation');
         }
 
         function escapeHtml(text) {
