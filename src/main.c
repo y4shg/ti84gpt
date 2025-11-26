@@ -22,10 +22,9 @@ typedef struct Message {
 #define INPUT_BUFFER_SIZE 256
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
-#define BUBBLE_MARGIN 8
-#define BUBBLE_PADDING 4
-#define LINE_HEIGHT 8
-#define CHAR_WIDTH 4
+#define MAX_LINE_WIDTH 38
+#define CHAR_WIDTH 8
+#define CHAR_HEIGHT 8
 
 global_t global;
 char receiveBuffer[BUFFER_SIZE];
@@ -54,7 +53,6 @@ void takeInput(void);
 void sendMessage(void);
 void clearInput(void);
 void freeMessages(void);
-int wrapText(const char* text, int maxWidth, char lines[][50], int maxLines);
 
 int main(void) {
     usb_error_t error;
@@ -65,12 +63,12 @@ int main(void) {
     
     gfx_Begin();
     gfx_SetDrawBuffer();
-    gfx_SetTextBGColor(0);
     gfx_SetTextFGColor(255);
-    gfx_SetTextTransparentColor(0);
+    gfx_SetTextBGColor(0);
+    gfx_SetMonospaceFont(8);
     
     drawConnectingScreen();
-    gfx_BlitBuffer();
+    gfx_SwapDraw();
     
     if ((error = usb_Init(handleUsbEvent, &global, NULL, USB_DEFAULT_INIT_FLAGS)) == USB_SUCCESS) {
         while (true) {
@@ -91,20 +89,20 @@ int main(void) {
                 // Scroll with arrow keys
                 if (kb_Data[7] & kb_Up) {
                     if (scrollOffset > 0) {
-                        scrollOffset -= 20;
+                        scrollOffset -= 16;
                         if (scrollOffset < 0) scrollOffset = 0;
                         drawMessages();
-                        gfx_BlitBuffer();
+                        gfx_SwapDraw();
                     }
                     delay(100);
                 }
                 if (kb_Data[7] & kb_Down) {
-                    int maxScroll = totalMessagesHeight - (SCREEN_HEIGHT - 30);
+                    int maxScroll = totalMessagesHeight - 190;
                     if (scrollOffset < maxScroll && maxScroll > 0) {
-                        scrollOffset += 20;
+                        scrollOffset += 16;
                         if (scrollOffset > maxScroll) scrollOffset = maxScroll;
                         drawMessages();
-                        gfx_BlitBuffer();
+                        gfx_SwapDraw();
                     }
                     delay(100);
                 }
@@ -125,135 +123,110 @@ int main(void) {
 
 void drawConnectingScreen(void) {
     gfx_FillScreen(0);
-    
-    // Title box
-    gfx_SetColor(31);
-    gfx_FillRectangle(0, 0, SCREEN_WIDTH, 30);
     gfx_SetColor(255);
-    gfx_Rectangle(0, 0, SCREEN_WIDTH, 30);
     
-    gfx_SetTextBGColor(31);
-    gfx_SetTextFGColor(255);
-    gfx_SetTextXY(80, 10);
-    gfx_PrintString("TI-84 ChatGPT");
+    // Title
+    gfx_PrintStringXY("TI-84 PLUS CE - CHATGPT", 60, 20);
+    gfx_Line(20, 35, 300, 35);
     
     // Status
-    gfx_SetTextBGColor(0);
-    gfx_SetTextFGColor(255);
-    gfx_SetTextXY(10, 50);
     if (connected) {
-        gfx_PrintString("Status: Connected");
+        gfx_PrintStringXY("Status: Connected!", 80, 60);
     } else {
-        gfx_PrintString("Status: Connecting...");
+        gfx_PrintStringXY("Status: Connecting...", 70, 60);
+        gfx_PrintStringXY("Plug in USB and connect", 60, 80);
+        gfx_PrintStringXY("from browser", 100, 95);
     }
     
-    gfx_SetTextXY(10, 70);
-    gfx_PrintString("Plug in USB cable and");
-    gfx_SetTextXY(10, 82);
-    gfx_PrintString("connect from browser");
-    
-    // Credits
-    gfx_SetColor(224);
-    gfx_FillRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40);
-    gfx_SetColor(255);
-    gfx_Rectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40);
-    
-    gfx_SetTextBGColor(224);
-    gfx_SetTextFGColor(0);
-    gfx_SetTextXY(90, SCREEN_HEIGHT - 28);
-    gfx_PrintString("Made by y4shg");
+    // Credits box
+    gfx_Rectangle(70, 140, 180, 40);
+    gfx_PrintStringXY("Made by y4shg", 105, 155);
     
     // Instructions
-    gfx_SetTextBGColor(0);
-    gfx_SetTextFGColor(255);
-    gfx_SetTextXY(10, SCREEN_HEIGHT - 15);
-    gfx_PrintString("CLEAR = Quit");
+    gfx_PrintStringXY("Press CLEAR to quit", 85, 210);
 }
 
 void drawMessages(void) {
     gfx_FillScreen(0);
-    
-    // Top bar
-    gfx_SetColor(31);
-    gfx_FillRectangle(0, 0, SCREEN_WIDTH, 20);
     gfx_SetColor(255);
-    gfx_Rectangle(0, 0, SCREEN_WIDTH, 20);
     
-    gfx_SetTextBGColor(31);
-    gfx_SetTextFGColor(255);
-    gfx_SetTextXY(5, 6);
+    // Header
     if (waitingForResponse) {
-        gfx_PrintString("ChatGPT - Waiting...");
+        gfx_PrintStringXY("ChatGPT - Waiting...", 5, 5);
     } else {
-        gfx_PrintString("ChatGPT - Ready");
+        gfx_PrintStringXY("ChatGPT - Ready", 5, 5);
     }
+    gfx_Line(0, 18, 320, 18);
     
-    // Bottom bar
-    gfx_SetColor(31);
-    gfx_FillRectangle(0, SCREEN_HEIGHT - 15, SCREEN_WIDTH, 15);
-    gfx_SetColor(255);
-    gfx_Rectangle(0, SCREEN_HEIGHT - 15, SCREEN_WIDTH, 15);
+    // Footer
+    gfx_Line(0, 220, 320, 220);
+    gfx_PrintStringXY("2nd:Type  Arrows:Scroll  CLR:Quit", 5, 225);
     
-    gfx_SetTextBGColor(31);
-    gfx_SetTextFGColor(255);
-    gfx_SetTextXY(5, SCREEN_HEIGHT - 11);
-    gfx_PrintString("2nd=Type  Arrows=Scroll  CLEAR=Quit");
-    
-    // Draw messages
+    // Messages area (y: 22 to 215)
     int yPos = 25 - scrollOffset;
     Message* msg = messageHead;
-    totalMessagesHeight = 0;
+    totalMessagesHeight = 25;
     
     while (msg != NULL) {
-        // Wrap text into lines
-        char lines[20][50];
-        int numLines = wrapText(msg->text, 35, lines, 20);
+        int textLen = strlen(msg->text);
+        int linesNeeded = (textLen / MAX_LINE_WIDTH) + 1;
+        if (linesNeeded > 20) linesNeeded = 20;
         
-        int bubbleHeight = (numLines * LINE_HEIGHT) + (BUBBLE_PADDING * 2);
-        int bubbleWidth = 0;
+        int msgHeight = linesNeeded * (CHAR_HEIGHT + 2) + 8;
         
-        // Calculate max width needed
-        for (int i = 0; i < numLines; i++) {
-            int lineWidth = strlen(lines[i]) * CHAR_WIDTH + BUBBLE_PADDING * 2;
-            if (lineWidth > bubbleWidth) bubbleWidth = lineWidth;
-        }
-        
-        if (bubbleWidth > 200) bubbleWidth = 200;
-        
-        int xPos;
-        uint8_t bubbleColor;
-        uint8_t textColor;
-        
-        if (msg->isUser) {
-            // User message (right side, blue)
-            xPos = SCREEN_WIDTH - bubbleWidth - BUBBLE_MARGIN;
-            bubbleColor = 160;  // Blue
-            textColor = 255;    // White text
-        } else {
-            // AI message (left side, green)
-            xPos = BUBBLE_MARGIN;
-            bubbleColor = 192;  // Green
-            textColor = 0;      // Black text
-        }
-        
-        // Only draw if visible on screen
-        if (yPos + bubbleHeight > 20 && yPos < SCREEN_HEIGHT - 15) {
-            // Draw bubble
-            gfx_SetColor(bubbleColor);
-            gfx_FillRectangle(xPos, yPos, bubbleWidth, bubbleHeight);
-            gfx_SetColor(255);
-            gfx_Rectangle(xPos, yPos, bubbleWidth, bubbleHeight);
+        // Only draw if visible
+        if (yPos + msgHeight > 22 && yPos < 215) {
+            int xStart;
+            int boxWidth = 240;
+            uint8_t boxColor;
             
-            // Draw text
-            gfx_SetTextBGColor(bubbleColor);
-            gfx_SetTextFGColor(textColor);
-            for (int i = 0; i < numLines; i++) {
-                gfx_SetTextXY(xPos + BUBBLE_PADDING, yPos + BUBBLE_PADDING + (i * LINE_HEIGHT));
-                gfx_PrintString(lines[i]);
+            if (msg->isUser) {
+                xStart = SCREEN_WIDTH - boxWidth - 10;
+                boxColor = 29;  // Blue
+            } else {
+                xStart = 10;
+                boxColor = 224; // Green
             }
+            
+            // Draw message box
+            gfx_SetColor(boxColor);
+            gfx_FillRectangle(xStart, yPos, boxWidth, msgHeight);
+            gfx_SetColor(255);
+            gfx_Rectangle(xStart, yPos, boxWidth, msgHeight);
+            
+            // Draw text line by line
+            gfx_SetTextFGColor(0);
+            int lineY = yPos + 4;
+            int charsPrinted = 0;
+            
+            for (int line = 0; line < linesNeeded && charsPrinted < textLen; line++) {
+                char lineBuf[MAX_LINE_WIDTH + 1];
+                int charsThisLine = textLen - charsPrinted;
+                if (charsThisLine > MAX_LINE_WIDTH) {
+                    charsThisLine = MAX_LINE_WIDTH;
+                    
+                    // Try to break at space
+                    for (int i = MAX_LINE_WIDTH - 1; i > MAX_LINE_WIDTH - 10 && i > 0; i--) {
+                        if (msg->text[charsPrinted + i] == ' ') {
+                            charsThisLine = i + 1;
+                            break;
+                        }
+                    }
+                }
+                
+                strncpy(lineBuf, msg->text + charsPrinted, charsThisLine);
+                lineBuf[charsThisLine] = '\0';
+                
+                gfx_PrintStringXY(lineBuf, xStart + 4, lineY);
+                
+                charsPrinted += charsThisLine;
+                lineY += CHAR_HEIGHT + 2;
+            }
+            
+            gfx_SetTextFGColor(255);
         }
         
-        yPos += bubbleHeight + 5;
+        yPos += msgHeight + 6;
         totalMessagesHeight = yPos + scrollOffset - 25;
         msg = msg->next;
     }
@@ -261,50 +234,46 @@ void drawMessages(void) {
 
 void drawInputScreen(void) {
     gfx_FillScreen(0);
-    
-    // Title
-    gfx_SetColor(31);
-    gfx_FillRectangle(0, 0, SCREEN_WIDTH, 25);
     gfx_SetColor(255);
-    gfx_Rectangle(0, 0, SCREEN_WIDTH, 25);
     
-    gfx_SetTextBGColor(31);
+    // Header
+    gfx_PrintStringXY("Type Your Message", 80, 5);
+    gfx_Line(0, 18, 320, 18);
+    
+    // Input area box
+    gfx_Rectangle(10, 25, 300, 180);
+    
+    // Draw input text
     gfx_SetTextFGColor(255);
-    gfx_SetTextXY(80, 8);
-    gfx_PrintString("Type Message");
+    int yPos = 30;
+    int xPos = 15;
     
-    // Input box
-    gfx_SetColor(64);
-    gfx_FillRectangle(10, 35, SCREEN_WIDTH - 20, SCREEN_HEIGHT - 70);
-    gfx_SetColor(255);
-    gfx_Rectangle(10, 35, SCREEN_WIDTH - 20, SCREEN_HEIGHT - 70);
-    
-    // Draw input text with wrapping
-    char lines[15][38];
-    int numLines = wrapText(inputBuffer, 38, lines, 15);
-    
-    gfx_SetTextBGColor(64);
-    gfx_SetTextFGColor(255);
-    for (int i = 0; i < numLines && i < 15; i++) {
-        gfx_SetTextXY(15, 40 + (i * LINE_HEIGHT));
-        gfx_PrintString(lines[i]);
+    for (int i = 0; i < inputIndex; i++) {
+        char c[2] = {inputBuffer[i], '\0'};
+        
+        if (xPos > 300) {
+            xPos = 15;
+            yPos += CHAR_HEIGHT + 2;
+        }
+        
+        if (yPos > 195) break; // Don't draw past box
+        
+        gfx_PrintStringXY(c, xPos, yPos);
+        xPos += CHAR_WIDTH;
     }
     
-    // Cursor
-    int cursorLine = inputIndex / 38;
-    int cursorCol = inputIndex % 38;
-    if (cursorLine < 15) {
-        gfx_SetColor(255);
-        gfx_FillRectangle(15 + (cursorCol * CHAR_WIDTH), 40 + (cursorLine * LINE_HEIGHT), 2, LINE_HEIGHT);
+    // Draw cursor
+    if (xPos > 300) {
+        xPos = 15;
+        yPos += CHAR_HEIGHT + 2;
+    }
+    if (yPos <= 195) {
+        gfx_FillRectangle(xPos, yPos, 6, CHAR_HEIGHT);
     }
     
-    // Instructions
-    gfx_SetTextBGColor(0);
-    gfx_SetTextFGColor(255);
-    gfx_SetTextXY(10, SCREEN_HEIGHT - 25);
-    gfx_PrintString("ENTER = Send    CLEAR = Cancel");
-    gfx_SetTextXY(10, SCREEN_HEIGHT - 13);
-    gfx_PrintString("DEL = Backspace");
+    // Footer
+    gfx_Line(0, 210, 320, 210);
+    gfx_PrintStringXY("ENTER:Send  DEL:Backspace  CLR:Cancel", 5, 220);
 }
 
 void takeInput(void) {
@@ -314,7 +283,7 @@ void takeInput(void) {
     inInputMode = true;
     
     drawInputScreen();
-    gfx_BlitBuffer();
+    gfx_SwapDraw();
     
     while (inInputMode) {
         uint8_t key = os_GetCSC();
@@ -331,26 +300,26 @@ void takeInput(void) {
         } else if (key == sk_Del) {
             if (inputIndex > 0) {
                 inputIndex--;
-                inputBuffer[inputIndex] = 0;
+                inputBuffer[inputIndex] = '\0';
                 drawInputScreen();
-                gfx_BlitBuffer();
+                gfx_SwapDraw();
             }
         } else if (chars[key] && inputIndex < INPUT_BUFFER_SIZE - 1) {
             inputBuffer[inputIndex++] = chars[key];
-            inputBuffer[inputIndex] = 0;
+            inputBuffer[inputIndex] = '\0';
             drawInputScreen();
-            gfx_BlitBuffer();
+            gfx_SwapDraw();
         }
         
         delay(50);
     }
     
-    // Auto-scroll to bottom when new message added
-    int maxScroll = totalMessagesHeight - (SCREEN_HEIGHT - 30);
+    // Auto-scroll to bottom
+    int maxScroll = totalMessagesHeight - 190;
     if (maxScroll > 0) scrollOffset = maxScroll;
     
     drawMessages();
-    gfx_BlitBuffer();
+    gfx_SwapDraw();
 }
 
 void sendMessage(void) {
@@ -402,39 +371,6 @@ void freeMessages(void) {
     messageHead = messageTail = NULL;
 }
 
-int wrapText(const char* text, int maxWidth, char lines[][50], int maxLines) {
-    int lineCount = 0;
-    int textLen = strlen(text);
-    int pos = 0;
-    
-    while (pos < textLen && lineCount < maxLines) {
-        int lineLen = 0;
-        int lastSpace = -1;
-        
-        while (pos + lineLen < textLen && lineLen < maxWidth) {
-            if (text[pos + lineLen] == ' ') {
-                lastSpace = lineLen;
-            }
-            lineLen++;
-        }
-        
-        // If we didn't reach the end and there's a space, break at space
-        if (pos + lineLen < textLen && lastSpace > 0) {
-            lineLen = lastSpace;
-        }
-        
-        strncpy(lines[lineCount], text + pos, lineLen);
-        lines[lineCount][lineLen] = 0;
-        
-        pos += lineLen;
-        if (pos < textLen && text[pos] == ' ') pos++; // Skip space
-        
-        lineCount++;
-    }
-    
-    return lineCount;
-}
-
 static usb_error_t handleBulkOut(usb_endpoint_t endpoint, usb_transfer_status_t status,
                                   size_t transferred, usb_transfer_data_t* data) {
     if (status == USB_TRANSFER_COMPLETED && transferred > 0) {
@@ -444,11 +380,11 @@ static usb_error_t handleBulkOut(usb_endpoint_t endpoint, usb_transfer_status_t 
                 receiveBuffer[receiveIndex++] = c;
             }
         }
-        receiveBuffer[receiveIndex] = 0;
+        receiveBuffer[receiveIndex] = '\0';
         
         char* newline = strchr(receiveBuffer, '\n');
         if (newline) {
-            *newline = 0;
+            *newline = '\0';
             
             addMessage(receiveBuffer, false);
             
@@ -458,11 +394,11 @@ static usb_error_t handleBulkOut(usb_endpoint_t endpoint, usb_transfer_status_t 
             waitingForResponse = false;
             
             // Auto-scroll to bottom
-            int maxScroll = totalMessagesHeight - (SCREEN_HEIGHT - 30);
+            int maxScroll = totalMessagesHeight - 190;
             if (maxScroll > 0) scrollOffset = maxScroll;
             
             drawMessages();
-            gfx_BlitBuffer();
+            gfx_SwapDraw();
         }
     }
     
@@ -503,7 +439,7 @@ static usb_error_t handleUsbEvent(usb_event_t event, void* event_data, void* cal
             handleBulkOut(global_ptr->out, USB_TRANSFER_COMPLETED, 0, usbBuffer);
             
             drawMessages();
-            gfx_BlitBuffer();
+            gfx_SwapDraw();
             break;
         }
         
@@ -514,7 +450,7 @@ static usb_error_t handleUsbEvent(usb_event_t event, void* event_data, void* cal
                 connected = false;
                 
                 drawConnectingScreen();
-                gfx_BlitBuffer();
+                gfx_SwapDraw();
             }
             break;
             
